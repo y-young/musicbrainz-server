@@ -6,6 +6,27 @@
       target: '/artist/create',
       value: '',
     },
+    // restrict link type options for URL
+    {
+      command: 'click',
+      target: "xpath=(//table[@id='external-links-editor']//input[@type='url'])[1]",
+      value: '',
+    },
+    {
+      command: 'sendKeys',
+      target: "xpath=(//table[@id='external-links-editor']//input[@type='url'])[1]",
+      value: 'https://archive.org/',
+    },
+    {
+      command: 'assertEval',
+      target: "Array.from(document.querySelectorAll('select.link-type > option')).map(x => x.innerText.trim()).toString()",
+      value: ",get the music,download music for free,stream for free",
+    },
+    {
+      command: 'click',
+      target: "xpath=//table[@id='external-links-editor']//tr[1]//button[contains(@class, 'remove-item')]",
+      value: '',
+    },
     // automatic link type detection for URL
     {
       command: 'click',
@@ -101,27 +122,6 @@
       command: 'assertText',
       target: "xpath=//table[@id='external-links-editor']//tr[contains(@class, 'external-link-item')][2]//div[contains(@class, 'error')]",
       value: 'Please don’t enter bundled/shortened URLs, enter the destination URL(s) instead.',
-    },
-    {
-      command: 'click',
-      target: "xpath=//table[@id='external-links-editor']//tr[contains(@class, 'external-link-item')][2]//button[contains(@class, 'remove-item')]",
-      value: '',
-    },
-    // deprecated link type detection for new links
-    {
-      command: 'sendKeys',
-      target: "xpath=(//table[@id='external-links-editor']//input[@type='url'])[1]",
-      value: 'http://example.com/',
-    },
-    {
-      command: 'select',
-      target: 'css=select.link-type',
-      value: 'label=regexp:\\s*MusicMoz',
-    },
-    {
-      command: 'assertText',
-      target: "xpath=//table[@id='external-links-editor']//tr[contains(@class, 'relationship-item')][2]//div[contains(@class, 'error')]",
-      value: 'This relationship type is deprecated and should not be used.',
     },
     {
       command: 'click',

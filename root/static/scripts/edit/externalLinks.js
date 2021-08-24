@@ -74,7 +74,7 @@ type LinksEditorProps = {
   errorObservable: (boolean) => void,
   initialLinks: Array<LinkStateT>,
   sourceType: CoreEntityTypeT,
-  typeOptions: Array<React.Element<'option'>>,
+  typeOptions: Array<Object>,
 };
 
 type LinksEditorState = {
@@ -85,10 +85,17 @@ export class ExternalLinksEditor
   extends React.Component<LinksEditorProps, LinksEditorState> {
   tableRef: {current: HTMLTableElement | null};
 
+  generalLinkTypes: Array<Object>;
+
   constructor(props: LinksEditorProps) {
     super(props);
     this.state = {links: withOneEmptyLink(props.initialLinks)};
     this.tableRef = React.createRef();
+    this.generalLinkTypes = props.typeOptions.filter(
+      // Keep disabled options for grouping
+      (option) => option.disabled
+        || !URLCleanup.RESTRICTED_LINK_TYPES.includes(option.data.gid),
+    );
   }
 
   setLinkState(
@@ -132,6 +139,13 @@ export class ExternalLinksEditor
         let newLink = Object.assign({}, newLinks[index], {url, rawUrl});
         const checker = new URLCleanup.Checker(url, this.props.sourceType);
         const guessedType = checker.guessType();
+        const possibleTypes = checker.getPossibleTypes();
+        const typeOptions = this.filterTypeOptions(possibleTypes);
+        // Clear selection if current type is not allowed
+        if (link.type &&
+          !typeOptions.some(option => option.data.id === link.type)) {
+          newLink.type = null;
+        }
         if (!newLink.type && guessedType) {
           newLink.type = linkedEntities.link_type[guessedType].id;
         }
@@ -547,6 +561,23 @@ export class ExternalLinksEditor
     return error;
   }
 
+  filterTypeOptions(
+    possibleTypes: Array<string> | false,
+  ): Array<Object> {
+    if (!possibleTypes) {
+      return this.generalLinkTypes;
+    }
+    return this.props.typeOptions.filter((option) => {
+      // Keep disabled options for grouping
+      if (option.disabled) {
+        return true;
+      }
+      return possibleTypes.some((types) => {
+        return types === option.data.gid;
+      });
+    });
+  }
+
   render(): React.Element<'table'> {
     this.props.errorObservable(false);
 
@@ -587,11 +618,16 @@ export class ExternalLinksEditor
             const checker = new URLCleanup.Checker(
               url, this.props.sourceType,
             );
+            const possibleTypes = checker.getPossibleTypes();
+            const selectedTypes = [];
+            const typeOptions = this.filterTypeOptions(possibleTypes);
             links.forEach(link => {
               linkIndexes.push(link.index);
               const linkType = link.type
                 ? linkedEntities.link_type[link.type] : {};
+              selectedTypes.push(linkType.gid);
               link.url = getUnicodeUrl(link.url);
+
               const error = this.validateLink(link, checker);
               if (error) {
                 this.props.errorObservable(true);
@@ -649,7 +685,7 @@ export class ExternalLinksEditor
                 }
                 rawUrl={rawUrl}
                 relationships={links}
-                typeOptions={this.props.typeOptions}
+                typeOptions={typeOptions}
                 url={url}
                 validateLink={(link) => this.validateLink(link)}
               />
@@ -662,7 +698,7 @@ export class ExternalLinksEditor
 }
 
 type LinkTypeSelectProps = {
-  children: Array<React.Element<'option'>>,
+  children: Array<React.Element<'option'> | null>,
   handleTypeBlur:
     (SyntheticFocusEvent<HTMLSelectElement>) => void,
   handleTypeChange:
@@ -722,7 +758,7 @@ type ExternalLinkRelationshipProps = {
   onTypeChange: (number, SyntheticEvent<HTMLSelectElement>) => void,
   onVideoChange:
   (number, SyntheticEvent<HTMLInputElement>) => void,
-  typeOptions: Array<React.Element<'option'>>,
+  typeOptions: Array<Object>,
 };
 
 const ExternalLinkRelationship =
@@ -756,7 +792,27 @@ const ExternalLinkRelationship =
                       }
                       type={link.type}
                     >
-                      {props.typeOptions}
+                      {props.typeOptions.map((option, index) => {
+                        const nextOption = props.typeOptions[index + 1];
+                        if (!option.disabled ||
+                          // Ignore empty groups
+                          (nextOption &&
+                            // Is not a group delimiter
+                            !nextOption.disabled &&
+                            // Is an item in group
+                            nextOption.text !== nextOption.text.trim())) {
+                          return (
+                            <option
+                              disabled={option.disabled}
+                              key={option.value}
+                              value={option.value}
+                            >
+                              {option.text}
+                            </option>
+                          );
+                        }
+                        return null;
+                      })}
                     </LinkTypeSelect>
                   ) : (
                     linkType ? (
@@ -840,7 +896,7 @@ type LinkProps = {
     (number, SyntheticEvent<HTMLInputElement>) => void,
   rawUrl: string,
   relationships: Array<LinkRelationshipT>,
-  typeOptions: Array<React.Element<'option'>>,
+  typeOptions: Array<Object>,
   url: string,
   validateLink: (LinkStateT) => ErrorT | null,
 };
@@ -1332,19 +1388,9 @@ MB.createExternalLinksEditor = function (options: InitialOptionsT) {
     return link;
   });
 
-  const typeOptions = (
-    linkTypeOptions(
-      {children: linkedEntities.link_type_tree[entityTypes]},
-      /^url-/.test(entityTypes),
-    ).map((data) => (
-      <option
-        disabled={data.disabled}
-        key={data.value}
-        value={data.value}
-      >
-        {data.text}
-      </option>
-    ))
+  const typeOptions = linkTypeOptions(
+    {children: linkedEntities.link_type_tree[entityTypes]},
+    /^url-/.test(entityTypes),
   );
 
   const errorObservable = options.errorObservable ||
