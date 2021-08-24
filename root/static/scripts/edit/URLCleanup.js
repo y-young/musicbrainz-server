@@ -8,6 +8,7 @@
  */
 
 import $ from 'jquery';
+import {haveSameContent} from '../common/utility/arrays';
 
 type EntityTypesMap = {
   [entityType: CoreEntityTypeT]: string | Array<string>,
@@ -2306,7 +2307,7 @@ const CLEANUPS: CleanupEntries = {
   },
   'jamendo': {
     match: [new RegExp('^(https?://)?([^/]+\\.)?jamendo\\.com', 'i')],
-    restrict: [LINK_TYPES.downloadfree],
+    restrict: [multiple(LINK_TYPES.downloadfree, LINK_TYPES.streamingfree)],
     clean: function (url) {
       url = url.replace(/jamendo\.com\/(?:\w\w\/)?(album|list|track)\/([^\/]+)(\/.*)?$/, 'jamendo.com/$1/$2');
       url = url.replace(/img\.jamendo\.com\/albums\/(\d+)\/covers\/\d+\.\d+\.jpg/, 'www.jamendo.com/album/$1/');
@@ -4685,7 +4686,6 @@ entitySpecificRules.recording = function (url) {
  *  ...
  * }
  */
-// eslint-disable-next-line no-unused-vars
 function multiple(...types): EntityTypesMap {
   const result = {};
   types.forEach(function (type: EntityTypeMap) {
@@ -4796,6 +4796,48 @@ export class Checker {
       result: RESTRICTED_LINK_TYPES.indexOf(id) === -1,
       target: ERROR_TARGETS.RELATIONSHIP,
     };
+  }
+
+  /*
+   * Validate relationship type combination.
+   * Should only be triggered after every single type
+   * has passed validation.
+   */
+  checkRelationships(
+    selectedTypes: Array<string>,
+    allowedTypes: Array<RelationshipTypeT> | false,
+  ): ValidationResult {
+    if (!allowedTypes) {
+      return {result: true};
+    }
+    // Only a single type is selected
+    if (selectedTypes.length === 1) {
+      const type = selectedTypes[0];
+      const result = allowedTypes.some(
+        allowedType => allowedType === type,
+      );
+      if (!result) {
+        return {
+          result: false,
+          error: l('Some relationship types are missing for this URL.'),
+          target: ERROR_TARGETS.URL,
+        };
+      }
+      return {result: true};
+    }
+    // Multiple types are selected
+    const result = allowedTypes.some(
+      (allowedType) => typeof allowedType === 'object' &&
+        haveSameContent(selectedTypes, allowedType),
+    );
+    if (!result) {
+      return {
+        result: false,
+        error: l('This relationship type combination is invalid.'),
+        target: ERROR_TARGETS.URL,
+      };
+    }
+    return {result: true};
   }
 
   filterApplicableTypes(

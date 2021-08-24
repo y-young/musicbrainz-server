@@ -178,3 +178,24 @@ export function uniqBy<T, U>(
     return result;
   }, []);
 }
+
+/*
+ * Check if two arrays have the same items, disregarding the order.
+ */
+export function haveSameContent<T>(a: Array<T>, b: Array<T>): boolean {
+  if (typeof a !== 'object' || typeof b !== 'object') {
+    return false;
+  }
+  for (const value of new Set([...a, ...b])) {
+    const _a = a.filter(function(element) {
+      return element === value;
+    });
+    const _b = b.filter(function(element) {
+      return element === value;
+    });
+    if (_a.length !== _b.length) {
+      return false;
+    }
+  }
+  return true;
+}
