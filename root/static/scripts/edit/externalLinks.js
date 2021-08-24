@@ -73,7 +73,7 @@ export type LinkRelationshipT = LinkStateT & {
 type LinksEditorProps = {
   errorObservable: (boolean) => void,
   initialLinks: Array<LinkStateT>,
-  sourceType: string,
+  sourceType: CoreEntityTypeT,
   typeOptions: Array<React.Element<'option'>>,
 };
 
@@ -438,7 +438,7 @@ export class ExternalLinksEditor
 
   validateLink(
     link: LinkStateT,
-    checker?: typeof URLCleanup.Checker,
+    checker?: URLCleanup.Checker,
   ): ErrorT | null {
     const oldLinks = this.getOldLinksHash();
     const linksByTypeAndUrl = groupBy(
